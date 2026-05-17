@@ -1,13 +1,16 @@
 package com.example.project.service;
 
 
-import com.example.project.DTO.LoginResponse;
-import com.example.project.DTO.RefreshRequest;
-import com.example.project.DTO.SignupRequest;
+import com.example.project.DTO.*;
+import com.example.project.entity.OtpVerification;
 import com.example.project.entity.RefreshToken;
 import com.example.project.entity.UserEntity;
+import com.example.project.exception.NoEmailFoundException;
 import com.example.project.exception.UserAlreadyExistsException;
+import com.example.project.exception.UserNotVerified;
+import com.example.project.repository.OtpVerificationRepository;
 import com.example.project.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -16,7 +19,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.example.project.DTO.LoginRequest;
+
+import java.util.Optional;
 
 
 @Service
@@ -28,6 +32,9 @@ public class AuthService
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private  final  OtpService otpService;
+    private  final  EmailService emailService;
+    private final OtpVerificationRepository otpVerificationRepository;
 
     public String signup(SignupRequest request)
     {
@@ -48,22 +55,32 @@ public class AuthService
         {
             throw new RuntimeException("fill all the fields");
         }
-        UserEntity user = new UserEntity();
+
+
+
+        String hashedPassword = passwordEncoder.encode(request.getPassword());
+
+        String otp = otpService.generateOtp();
+        UserEntity user=new UserEntity();
         user.setFirstName(request.getFirstName());
-        user.setLastName(request.getLastName());
         user.setEmail(request.getEmail());
-        user.setUsername(request.getUsername());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole("USER");
-        user.setVerified(false);
+        user.setLastName(request.getLastName());
+        user.setPassword(hashedPassword);
         userRepository.save(user);
 
-        return "User registered successfully";
+        otpService.saveOtp(
+                request.getEmail(),
+                request.getUsername(),
+                otp
+        );
+
+
+
+        return "OTP sent to email";
     }
 
     public LoginResponse login(LoginRequest request)
     {
-        System.out.println(request.getUsername()+" "+request.getPassword());
 
         Authentication authentication=authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -127,4 +144,61 @@ public class AuthService
         return "Logged out successfully";
     }
 
+    @Transactional
+    public String verifyOtpForSignup(OtpVerificationRequest request)
+    {
+
+        OtpVerification record = otpService.verifyOtp(
+                request.getEmail(),
+                request.getOtp()
+        );
+
+        UserEntity user =userRepository.findByEmail(record.getEmail()) .orElseThrow(() -> new NoEmailFoundException("Email is wrong"));;
+
+        user.setUsername(record.getUsername());
+        user.setVerified(true);
+        user.setRole("USER");
+
+        userRepository.save(user);
+
+        otpVerificationRepository.delete(record);
+
+        emailService.sendWelcomeEmail(record.getEmail(), record.getUsername());
+
+        return "Signup successful";
+    }
+
+    public String SendOtpForForgotPassword(ResendOtp request)
+    {
+
+        UserEntity record = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new NoEmailFoundException("Email not found"));
+        if(record.isVerified()==false)
+            throw new UserNotVerified("User Not Verified with OTP");
+
+        String otp = otpService.generateOtp();
+        otpService.saveOtp(request.getEmail(), record.getUsername(), otp);
+
+        return "OTP sent";
+    }
+
+
+    public String resetPassword(ResetPasswordDto request)
+    {
+        String email=request.getEmail();
+        String otp=request.getOtp();
+        OtpVerification record = otpService.verifyOtp(
+                request.getEmail(),
+                request.getOtp()
+        );
+        UserEntity user =userRepository.findByEmail(record.getEmail()) .orElseThrow(() -> new NoEmailFoundException("Email is wrong"));
+        if(!user.isVerified())
+        throw  new UserNotVerified("Verfication has not done for this account ,Verify First to reset password");
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+        userRepository.save(user);
+
+        return "password is reset";
+
+    }
 }
