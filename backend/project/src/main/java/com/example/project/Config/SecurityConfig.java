@@ -73,6 +73,10 @@ public class SecurityConfig {
                                                 "/api/auth/signup",
                                                 "/api/auth/login",
                                                 "/api/auth/refresh",
+                                                "/api/auth/verify-otp",
+                                                "/api/auth/resend-otp",
+                                                "/api/auth/reset-password",
+                                                "/api/auth/forgot-password",
                                                 "/h2-console/**"
                                         )
                                         .permitAll()

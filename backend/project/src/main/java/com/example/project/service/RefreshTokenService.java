@@ -17,12 +17,12 @@ public class RefreshTokenService
 {
     private final RefreshTokenRepository refreshTokenRepository;
     private  final UserRepository userRepository;
-
-    public RefreshToken createRefreshToken(
-            UserEntity user)
+    @Transactional
+    public RefreshToken createRefreshToken(UserEntity user)
     {
-        refreshTokenRepository
-                .deleteByUser(user);
+        refreshTokenRepository.deleteByUser(user);
+
+        refreshTokenRepository.flush();
 
         RefreshToken refreshToken =
                 new RefreshToken();
@@ -30,19 +30,15 @@ public class RefreshTokenService
         refreshToken.setUser(user);
 
         refreshToken.setToken(
-                UUID.randomUUID()
-                        .toString()
+                UUID.randomUUID().toString()
         );
 
         refreshToken.setExpiryDate(
-                LocalDateTime.now()
-                        .plusDays(7)
+                LocalDateTime.now().plusDays(7)
         );
 
-        return refreshTokenRepository
-                .save(refreshToken);
+        return refreshTokenRepository.save(refreshToken);
     }
-
 
 
     public RefreshToken verifyRefreshToken(String token)

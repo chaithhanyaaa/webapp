@@ -34,6 +34,47 @@ public class GlobalExceptionHandler
                 .body(error);
     }
 
+    @ExceptionHandler(NoEmailFoundException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(NoEmailFoundException ex)
+    {
+        ErrorResponse error = new ErrorResponse(
+                java.time.LocalDateTime
+                        .now()
+                        .toString(),
+
+                HttpStatus.NOT_FOUND.value(),
+
+                HttpStatus.CONFLICT
+                        .getReasonPhrase(),
+
+                ex.getMessage()
+        );
+
+        return ResponseEntity
+                .status(
+                        HttpStatus.CONFLICT
+                )
+                .body(error);
+    }
+
+    @ExceptionHandler(UserNotVerified.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(UserNotVerified ex)
+    {
+        ErrorResponse error=new ErrorResponse(
+                java.time.LocalDateTime.now().toString(),
+                HttpStatus.FORBIDDEN.value(),
+                HttpStatus.FORBIDDEN.getReasonPhrase(),
+                ex.getMessage()
+        );
+
+        return ResponseEntity
+                .status(
+                        HttpStatus.FORBIDDEN
+                )
+                .body(error);
+
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex)
     {
